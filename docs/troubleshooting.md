@@ -32,6 +32,19 @@ npm run prepare:resources
 
 运行 UI 测试时重建 `out/` 会删除旧文件名。等待测试进程完全退出，先运行 `npm run build`，再串行运行 `test:ui`、`test:program-ui` 与 `test:session`。不要对正式运行中的开发工作台覆盖构建资源。测试失败报告位于忽略提交的 `test-results/`。
 
+## Windows CI 将隔离临时目录识别为重定向
+
+部分 Windows runner 的 `TEMP` / `TMP` 使用 8.3 短路径（例如 `RUNNER~1`），而文件系统返回长路径。若测试报“工具根目录不能通过链接重定向”或工具页无法显示，先核对 `node -p "require('node:os').tmpdir()"` 与 `node -p "require('node:fs').realpathSync(require('node:os').tmpdir())"`。
+
+工作流在运行测试前将 `TEMP` / `TMP` 统一为真实路径，后续步骤通过 `GITHUB_ENV` 继承。手动运行测试时，可在当前 PowerShell 进程设置同样的临时目录；不要关闭产品的目录重定向保护或删除测试断言。
+
+```powershell
+$tempPath = node -p "require('node:fs').realpathSync(require('node:os').tmpdir())"
+if ($LASTEXITCODE -ne 0) { throw '无法解析临时目录的真实路径' }
+$env:TEMP = $tempPath
+$env:TMP = $tempPath
+```
+
 ## 新版拒绝替换管理服务
 
 先查看应用提示：活动任务、进程采样未就绪或旧架构活动会话都会阻止替换。等任务完成，或按 README 中的旧架构迁移说明手动处理首次切换。不要删除状态文件或强制结束真实游戏进程以消除提示。

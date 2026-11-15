@@ -37,6 +37,13 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+      - name: Normalize Windows temporary directory
+        shell: pwsh
+        run: |
+          $tempPath = node -p "require('node:fs').realpathSync(require('node:os').tmpdir())"
+          if ($LASTEXITCODE -ne 0) { throw '无法解析临时目录的真实路径' }
+          "TEMP=$tempPath" >> $env:GITHUB_ENV
+          "TMP=$tempPath" >> $env:GITHUB_ENV
       - run: npm ci
       - run: npm run check
       - run: npm audit --omit=dev --audit-level=moderate
@@ -63,6 +70,13 @@ jobs:
         with:
           version: "0.12.20"
           enable-cache: false
+      - name: Normalize Windows temporary directory
+        shell: pwsh
+        run: |
+          $tempPath = node -p "require('node:fs').realpathSync(require('node:os').tmpdir())"
+          if ($LASTEXITCODE -ne 0) { throw '无法解析临时目录的真实路径' }
+          "TEMP=$tempPath" >> $env:GITHUB_ENV
+          "TMP=$tempPath" >> $env:GITHUB_ENV
       - run: npm ci
       - run: npm run test:python
       - run: npm run test:go

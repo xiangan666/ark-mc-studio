@@ -47,6 +47,13 @@ jobs:
         with:
           version: "0.12.20"
           enable-cache: false
+      - name: Normalize Windows temporary directory
+        shell: pwsh
+        run: |
+          $tempPath = node -p "require('node:fs').realpathSync(require('node:os').tmpdir())"
+          if ($LASTEXITCODE -ne 0) { throw '无法解析临时目录的真实路径' }
+          "TEMP=$tempPath" >> $env:GITHUB_ENV
+          "TMP=$tempPath" >> $env:GITHUB_ENV
       - name: Verify candidate
         id: candidate
         env:
