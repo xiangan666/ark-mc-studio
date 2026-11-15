@@ -2,8 +2,9 @@ module local/nethernet-route-check
 
 go 1.27.0
 
+require github.com/df-mc/go-nethernet v1.0.27-0.20261102075145-0e1727705185
+
 require (
-	github.com/df-mc/go-nethernet v1.0.27-0.20261102075145-0e1727705185 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
@@ -23,8 +24,8 @@ require (
 	github.com/pion/turn/v5 v5.1.3 // indirect
 	github.com/pion/webrtc/v4 v4.2.26 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/net v0.50.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 )
