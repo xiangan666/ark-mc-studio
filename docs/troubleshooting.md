@@ -49,6 +49,8 @@ $env:TMP = $tempPath
 
 先查看应用提示：活动任务、进程采样未就绪或旧架构活动会话都会阻止替换。等任务完成，或按 README 中的旧架构迁移说明手动处理首次切换。不要删除状态文件或强制结束真实游戏进程以消除提示。
 
+若在西文 Windows 上持续提示“进程采样尚未就绪”，先确认运行的是 1.5.1 或更高版本。旧版 `telemetry.ps1` 包含无 BOM 的 UTF-8 中文文本，Windows PowerShell 5.1 按系统 ANSI 编码读取时可能产生语法错误，导致采样始终无法启动。1.5.1 将脚本保持为 ASCII，中文 JSON 错误信息使用 Unicode 转义，并增加西文编码解析及真实进程采样回归；不通过跳过就绪检查来启用重载。
+
 ## 便携启动器提示当前版本尚未生成
 
 根目录 `启动方舟MC.cmd` 从 `package.json` 读取版本，只启动对应文件，不按文件名猜测最新版本。源码使用者先运行 `npm run package`；普通使用者从 [Releases](https://github.com/xiangan666/ark-mc-studio/releases) 下载便携 EXE 直接运行。
