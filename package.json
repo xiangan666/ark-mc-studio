@@ -27,6 +27,7 @@
     "check": "npm run format:check && npm run check:project && npm run typecheck && npm test",
     "test:python": "uv run --no-project --python 3.13 --with-requirements tests/requirements.txt python tests/signal_router_test.py",
     "test:go": "go -C tools/nethernet-route-check test ./... && go -C tools/nethernet-route-check vet ./...",
+    "audit:go": "go -C tools/nethernet-route-check run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...",
     "test:portable": "node scripts/portable-smoke.cjs",
     "release:verify": "node scripts/finalize-release.cjs verify",
     "release:notes": "node scripts/release-notes.cjs"

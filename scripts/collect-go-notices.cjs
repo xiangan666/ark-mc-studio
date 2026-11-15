@@ -14,6 +14,7 @@ async function main() {
   );
   const go = JSON.parse(
     execFileSync("go", ["env", "-json", "GOROOT", "GOVERSION"], {
+      cwd: path.join(root, "tools/nethernet-route-check"),
       encoding: "utf8",
       windowsHide: true,
     }),

@@ -36,6 +36,7 @@ npm run check
 npm audit --omit=dev --audit-level=moderate
 npm run test:python
 npm run test:go
+npm run audit:go
 npm run build
 npm run test:program-ui
 npm run test:session
@@ -48,6 +49,8 @@ npm run test:session
 项目级 `.npmrc` 使用官方 npm registry，确保审计接口可用。更新依赖后核对 `npm audit` 的完整结果和 `npm audit --omit=dev` 的运行依赖结果。当前 `overrides` 仅将 `readdir-glob`、`@electron/universal` 和 `app-builder-lib` 使用的 `minimatch` 固定为 11.0.1，以修复 GHSA-g3hv-75wg-m249；这些调用方使用已核对的命名导出和 `Minimatch` API，兼容性由备份测试及便携打包验证。上游依赖消除相关受影响版本后，应移除对应覆盖并重跑检查与打包。
 
 npm 11 的 `allowScripts` 按实际包版本批准 esbuild、sharp，便携分发不使用 electron-winstaller，因此拒绝其安装脚本。新增或升级含安装脚本的依赖时，先审阅用途，再使用 `npm install-scripts approve <包名>` 或 `deny` 更新策略与锁文件；不要一次性批准所有依赖。
+
+Go 探针使用 `go.mod` 指定的最低补丁工具链；本机旧版 Go 可通过默认 `GOTOOLCHAIN=auto` 获取该版本，不必覆盖全局安装。`npm run audit:go` 运行固定为 v1.9.0 的官方 govulncheck，读取 Go 漏洞数据库并检查调用可达性；数据库或工具下载失败必须如实处理，不能当作无漏洞。升级间接依赖后运行 `test:go`、`audit:go` 并重新打包，确保发布 EXE 包含重新构建的探针。已知修复依据见 [Go 漏洞数据库](https://pkg.go.dev/vuln/)；Dependabot 的模块告警仍需结合实际调用链评估。
 
 涉及页面或桌面流程时，先阅读 [界面设计规范](.github/INTERFACE.md)，再运行 `npm run test:ui`。该检查覆盖十五页、180 组主题／密度／窗口组合和任务分区；`scripts/ui-workspace-design.cjs` 检查分类键盘、ARIA 面板、固定实例范围、文件分栏与隐藏分区快捷入口，并生成脱敏截图。修改分区时应保留旧操作及安全限制的验证，不能只修改选择器使检查通过。涉及 Windows 便携程序时运行 `npm run package` 和 `npm run test:portable`。`npx tsx scripts/acceptance.ts` 会联网下载并启动隔离的官方服务器核心，使用测试端口 29482 及其相邻端口、临时目录和较多下载空间；它不是默认 CI，需要手动按脚本前置条件执行。
 

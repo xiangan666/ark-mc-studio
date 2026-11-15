@@ -23,6 +23,7 @@ npm run check
 npm audit --omit=dev --audit-level=moderate
 npm run test:python
 npm run test:go
+npm run audit:go
 npm run prepare:resources
 npm run build
 npm run test:ui
@@ -50,7 +51,7 @@ git push origin "v$version"
 
 标签推送触发 `.github/workflows/release.yml`：
 
-1. 调用 CI，执行 Node 24/26 的格式、一致性、类型、单元测试、生产依赖审计和构建，以及隔离 Python、Go、UI、版本更新和游戏宿主回归。
+1. 调用 CI，执行 Node 24/26 的格式、一致性、类型、单元测试、生产依赖审计和构建，以及隔离 Python、Go、UI、版本更新和游戏宿主回归；govulncheck 检查 Go 探针及标准库的已知漏洞可达性。
 2. 在标签提交重新构建 Windows x64 便携 EXE，执行 `test:portable`，生成版本、提交和资产清单。
 3. 上传工作流产物，在独立发布任务创建或恢复 Release 草稿，上传资产并下载回来核对名称、大小、内容及 SHA-256。
 4. 校验通过后正式发布为稳定版，核实标签、`latest` 和 Release 状态。

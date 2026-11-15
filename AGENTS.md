@@ -18,6 +18,7 @@ npm run check
 npm run build
 npm run test:python
 npm run test:go
+npm run audit:go
 npm run prepare:resources
 npm run test:ui
 npm run test:program-ui

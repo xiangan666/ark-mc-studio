@@ -80,6 +80,7 @@ jobs:
       - run: npm ci
       - run: npm run test:python
       - run: npm run test:go
+      - run: npm run audit:go
       - run: npm run prepare:resources
       - run: npm run build
       - run: npm run test:ui

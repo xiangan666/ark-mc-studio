@@ -131,6 +131,7 @@ npm run check
 npm audit --omit=dev --audit-level=moderate
 npm run test:python
 npm run test:go
+npm run audit:go
 npm run build
 npm run test:ui
 npm run test:program-ui
