@@ -34,12 +34,12 @@ npm run prepare:resources
 
 ## Windows CI 将隔离临时目录识别为重定向
 
-部分 Windows runner 的 `TEMP` / `TMP` 使用 8.3 短路径（例如 `RUNNER~1`），而文件系统返回长路径。若测试报“工具根目录不能通过链接重定向”或工具页无法显示，先核对 `node -p "require('node:os').tmpdir()"` 与 `node -p "require('node:fs').realpathSync(require('node:os').tmpdir())"`。
+部分 Windows runner 的 `TEMP` / `TMP` 使用 8.3 短路径（例如 `RUNNER~1`），而文件系统返回长路径。若测试报“工具根目录不能通过链接重定向”或工具页无法显示，先核对 `node -p "require('node:os').tmpdir()"` 与 `node -p "require('node:fs').realpathSync.native(require('node:os').tmpdir())"`。必须使用原生实现；普通 `realpathSync` 不会展开 Windows 8.3 路径。
 
 工作流在运行测试前将 `TEMP` / `TMP` 统一为真实路径，后续步骤通过 `GITHUB_ENV` 继承。手动运行测试时，可在当前 PowerShell 进程设置同样的临时目录；不要关闭产品的目录重定向保护或删除测试断言。
 
 ```powershell
-$tempPath = node -p "require('node:fs').realpathSync(require('node:os').tmpdir())"
+$tempPath = node -p "require('node:fs').realpathSync.native(require('node:os').tmpdir())"
 if ($LASTEXITCODE -ne 0) { throw '无法解析临时目录的真实路径' }
 $env:TEMP = $tempPath
 $env:TMP = $tempPath
