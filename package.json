@@ -1,0 +1,191 @@
+{
+  "name": "ark-mc-studio",
+  "version": "1.5.1",
+  "private": true,
+  "description": "方舟 MC · ArkMC Studio — Windows 基岩版服务器工作台",
+  "author": "ArkMC Studio",
+  "license": "MIT",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "npm run build:agent && npm run build:server && npm run build:direct && npm run build:network && electron-vite dev",
+    "build:agent": "esbuild src/agent/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist-agent/agent.cjs",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && npm run build:agent && npm run build:server && npm run build:direct && npm run build:network && electron-vite build",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
+    "test:ui": "node scripts/ui-check.cjs",
+    "test:program-ui": "node scripts/ui-program-lifecycle.cjs",
+    "test:session": "node scripts/session-host-check.cjs",
+    "prepare:resources": "node scripts/prepare-resources.cjs",
+    "package": "npm run build && npm run prepare:resources && electron-builder --win portable --x64 && node scripts/finalize-release.cjs",
+    "start": "electron .",
+    "build:direct": "esbuild src/direct/host.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist-direct/host.cjs",
+    "build:network": "esbuild src/network/worker.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist-network/worker.cjs",
+    "build:server": "esbuild src/server/host.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist-server/host.cjs",
+    "format": "prettier --write . --ignore-path .gitignore",
+    "format:check": "prettier --check . --ignore-path .gitignore",
+    "check:project": "node scripts/check-project.cjs",
+    "check": "npm run format:check && npm run check:project && npm run typecheck && npm test",
+    "test:python": "uv run --no-project --python 3.13 --with-requirements tests/requirements.txt python tests/signal_router_test.py",
+    "test:go": "go -C tools/nethernet-route-check test ./... && go -C tools/nethernet-route-check vet ./...",
+    "test:portable": "node scripts/portable-smoke.cjs",
+    "release:verify": "node scripts/finalize-release.cjs verify",
+    "release:notes": "node scripts/release-notes.cjs"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-virtual": "^3.13.12",
+    "archiver": "^8.0.0",
+    "cron-parser": "^5.4.0",
+    "echarts": "^6.0.0",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.23.24",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "smol-toml": "^1.9.1",
+    "yauzl": "^3.2.0",
+    "zod": "^4.1.12",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/archiver": "^8.0.0",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/yauzl": "^2.10.3",
+    "@vitejs/plugin-react": "^5.1.0",
+    "electron": "45.2.1",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^5.0.0",
+    "esbuild": "^0.28.1",
+    "playwright": "^1.56.1",
+    "prettier": "^3.9.10",
+    "sharp": "^0.35.5",
+    "tailwindcss": "^4.1.17",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2"
+  },
+  "build": {
+    "appId": "studio.arkmc.desktop",
+    "productName": "ArkMC Studio",
+    "directories": {
+      "output": "_work/package",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-agent",
+        "to": "agent"
+      },
+      {
+        "from": "dist-direct",
+        "to": "direct"
+      },
+      {
+        "from": "dist-network",
+        "to": "network"
+      },
+      {
+        "from": "dist-server",
+        "to": "server"
+      },
+      {
+        "from": "resources/runtime",
+        "to": "runtime"
+      },
+      {
+        "from": "resources/telemetry.ps1",
+        "to": "telemetry.ps1"
+      },
+      {
+        "from": "resources/dpapi.ps1",
+        "to": "dpapi.ps1"
+      },
+      {
+        "from": "resources/probes",
+        "to": "probes"
+      },
+      {
+        "from": "resources/signal-router",
+        "to": "signal-router"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "README.md",
+        "to": "README.md"
+      },
+      {
+        "from": "CHANGELOG.md",
+        "to": "CHANGELOG.md"
+      },
+      {
+        "from": "LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "resources/notices",
+        "to": "notices"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "resources/icon.ico",
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "ArkMC-Studio-${version}-Windows-x64.exe"
+    }
+  },
+  "engines": {
+    "node": ">=24.10.0 <25 || >=26.0.0 <27",
+    "npm": ">=11 <12"
+  },
+  "packageManager": "npm@11.20.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiangan666/ark-mc-studio.git"
+  },
+  "homepage": "https://github.com/xiangan666/ark-mc-studio#readme",
+  "bugs": {
+    "url": "https://github.com/xiangan666/ark-mc-studio/issues"
+  },
+  "maintainers": [
+    {
+      "name": "相安",
+      "email": "3199912548@qq.com"
+    }
+  ],
+  "overrides": {
+    "readdir-glob": {
+      "minimatch": "11.0.1"
+    },
+    "@electron/universal": {
+      "minimatch": "11.0.1"
+    },
+    "app-builder-lib": {
+      "minimatch": "11.0.1"
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "sharp@0.35.5": true,
+    "electron-winstaller": false
+  }
+}

@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 已推送的稳定版本标签，例如 v1.5.1
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.tag || github.ref }}
+
+  package:
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 35
+    outputs:
+      commit: ${{ steps.candidate.outputs.commit }}
+      tag: ${{ steps.candidate.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: tools/nethernet-route-check/go.mod
+          cache-dependency-path: tools/nethernet-route-check/go.sum
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.20"
+          enable-cache: false
+      - name: Verify candidate
+        id: candidate
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          $expected = 'v' + (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:RELEASE_TAG -ne $expected) { throw '标签与清单版本不一致' }
+          $commit = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw '无法确定候选提交' }
+          "commit=$commit" >> $env:GITHUB_OUTPUT
+          "tag=$expected" >> $env:GITHUB_OUTPUT
+      - run: npm ci
+      - run: npm run package
+      - run: npm run test:portable
+      - run: npm run release:verify
+      - run: npm run release:notes
+      - run: Copy-Item -LiteralPath _work/release-notes.md -Destination release/release-notes.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.package.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: release/
+      - name: Publish and verify downloaded assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.package.outputs.tag }}
+        run: ./scripts/publish-release.ps1 -Tag $env:RELEASE_TAG -AssetDirectory release -Notes release/release-notes.md

@@ -1,0 +1,3 @@
+# 账号已核实为仓库所有者；CODEOWNERS 本身不启用分支保护。
+* @xiangan666
+/.github/ @xiangan666

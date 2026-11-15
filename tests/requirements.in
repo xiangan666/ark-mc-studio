@@ -1,0 +1,2 @@
+# 隔离 Python 信令回归；通过 uv pip compile 生成 requirements.txt。
+aiohttp==3.14.5

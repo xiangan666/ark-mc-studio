@@ -1,0 +1,213 @@
+@import "tailwindcss";
+@theme {
+  --font-sans:
+    "Segoe UI Variable Text", "Microsoft YaHei UI", "Segoe UI", sans-serif;
+}
+:root {
+  font-family: var(--font-sans);
+  --font-mono: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color-scheme: dark;
+  --bg: #10151c;
+  --sidebar: #151b23;
+  --surface: #1a222d;
+  --surface2: #202a36;
+  --hover: #263341;
+  --line: #354151;
+  --line-soft: #2a3543;
+  --text: #e9eef5;
+  --muted: #a4b0c0;
+  --dim: #8494a7;
+  --green: #66d1ba;
+  --green-strong: #46baa2;
+  --green-bg: #173e37;
+  --purple: #b6a5e5;
+  --purple-bg: #342c46;
+  --red: #f29a9e;
+  --red-bg: #402a32;
+  --amber: #e1bc76;
+  --blue: #8db9eb;
+  --radius: 10px;
+  --shadow: 0 16px 60px #0005;
+  --duration: 140ms;
+  --ease: ease;
+  --page-space: 24px;
+  --section-gap: 20px;
+  --row-space: 13px;
+  --control-height: 34px;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3f5f8;
+  --sidebar: #fafbfd;
+  --surface: #fff;
+  --surface2: #f4f6f9;
+  --hover: #eaf0f5;
+  --line: #d9e0e9;
+  --line-soft: #e8ecf1;
+  --text: #243044;
+  --muted: #56667b;
+  --dim: #6f7f93;
+  --green: #087e6d;
+  --green-strong: #066b5d;
+  --green-bg: #e5f3ef;
+  --purple: #7857a3;
+  --purple-bg: #f0ebf7;
+  --red: #bd4350;
+  --red-bg: #fbecef;
+  --amber: #966611;
+  --blue: #3f73ac;
+  --shadow: 0 16px 60px #24304420;
+}
+:root[data-density="compact"] {
+  --page-space: 20px;
+  --section-gap: 16px;
+  --row-space: 10px;
+  --control-height: 30px;
+}
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  font-size: 13px;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+  -webkit-app-region: no-drag;
+  touch-action: manipulation;
+}
+button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+a {
+  color: var(--green);
+  text-decoration: none;
+  -webkit-app-region: no-drag;
+}
+a:hover {
+  text-decoration: underline;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+input,
+textarea,
+select {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 7px 10px;
+  line-height: 1.4;
+}
+input,
+select {
+  min-height: var(--control-height);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--dim);
+}
+textarea {
+  resize: vertical;
+}
+input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  padding: 0;
+  accent-color: var(--green);
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.55;
+}
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+h2 {
+  font-size: 17px;
+}
+small {
+  font-size: 11px;
+}
+svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+kbd,
+code,
+.mono {
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+kbd {
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 1px 5px;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+[hidden] {
+  display: none !important;
+}
+.muted {
+  color: var(--muted);
+}
+.green-text {
+  color: var(--green);
+}
+.danger-text {
+  color: var(--red);
+}
+.push-right {
+  margin-left: auto;
+}
+.span-all {
+  grid-column: 1/-1;
+}
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+::selection {
+  background: color-mix(in srgb, var(--green) 25%, transparent);
+}
