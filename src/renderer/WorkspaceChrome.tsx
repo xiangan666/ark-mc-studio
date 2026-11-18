@@ -1,7 +1,7 @@
 import { useShallow } from "zustand/react/shallow";
 import {
   Bell,
-  Box,
+  Layers3,
   ChevronDown,
   ChevronRight,
   FolderOpen,
@@ -18,7 +18,8 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { act, useApp } from "./store";
+import { act, useApp, statusLabel } from "./store";
+import { startBlocker } from "./workbench";
 import { groups, isGlobal, navigation, pageInfo } from "./navigation";
 import { Badge, Button, IconButton, Status } from "./components";
 
@@ -55,7 +56,7 @@ export function WorkspaceSidebar() {
     <aside className="sidebar">
       <div className="brand drag">
         <div className="brand-icon">
-          <Box size={23} />
+          <Layers3 size={24} strokeWidth={2.1} />
         </div>
         <div className="brand-copy">
           <strong>
@@ -92,7 +93,11 @@ export function WorkspaceSidebar() {
         </div>
         <div className="instance-switcher-meta">
           <span className={`small-dot ${snapshot?.pid ? "green" : ""}`} />
-          <span>{snapshot?.pid ? "正在运行" : "未运行"}</span>
+          <span>
+            {selected
+              ? statusLabel[snapshot?.status || "unknown"]
+              : "未选择实例"}
+          </span>
           <span>{data?.instances.length || 0} 个实例</span>
         </div>
       </div>
@@ -131,6 +136,7 @@ export function WorkspaceSidebar() {
                     <button
                       key={item.page}
                       data-page={item.page}
+                      aria-label={item.label}
                       className={`nav-item ${page === item.page ? "active" : ""}`}
                       aria-current={page === item.page ? "page" : undefined}
                       title={item.label}
@@ -182,12 +188,13 @@ export function WorkspaceHeader({
   onStop: () => void;
   onRestart: () => void;
 }) {
-  const { data, selected, page, density, setDensity } = useApp(
+  const { data, selected, page, density, setDensity, error } = useApp(
     useShallow((s) => ({
       data: s.data,
       selected: s.selected,
       page: s.page,
       density: s.density,
+      error: s.error,
       setDensity: s.setDensity,
     })),
   );
@@ -200,6 +207,7 @@ export function WorkspaceHeader({
       (j) =>
         j.instanceId === selected && ["running", "queued"].includes(j.status),
     );
+  const blocked = startBlocker(snapshot, !!data?.samplerReady, busy, !!error);
   return (
     <header className="topbar drag">
       <div
@@ -225,7 +233,10 @@ export function WorkspaceHeader({
             <IconButton
               label="重启服务器"
               disabled={
-                !snapshot?.pid || busy || !snapshot.capabilities.command
+                !snapshot?.pid ||
+                busy ||
+                !!error ||
+                !snapshot.capabilities.command
               }
               onClick={onRestart}
             >
@@ -234,7 +245,7 @@ export function WorkspaceHeader({
             {snapshot?.pid ? (
               <Button
                 variant="danger"
-                disabled={busy || !snapshot.capabilities.command}
+                disabled={busy || !!error || !snapshot.capabilities.command}
                 onClick={onStop}
               >
                 <Square size={12} />
@@ -243,7 +254,8 @@ export function WorkspaceHeader({
             ) : (
               <Button
                 variant="primary"
-                disabled={busy || !data?.samplerReady}
+                disabled={!!blocked}
+                title={blocked || undefined}
                 onClick={() =>
                   void act(
                     "server.action",
@@ -265,11 +277,12 @@ export function WorkspaceHeader({
         <button
           className="command-trigger"
           aria-label="搜索功能、实例与操作"
+          aria-keyshortcuts="Control+k"
           title="搜索功能、实例与操作 (Ctrl+K)"
           onClick={onPalette}
         >
           <Search size={16} />
-          <kbd>Ctrl K</kbd>
+          <span>命令搜索</span>
         </button>
         <IconButton label="活动与通知" onClick={onNotices}>
           <Bell size={17} />

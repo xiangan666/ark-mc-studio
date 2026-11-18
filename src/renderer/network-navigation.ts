@@ -13,7 +13,9 @@ export function networkSectionForTarget(target: string): NetworkSection | null {
   )
     return "diagnostics";
   if (target === "network-clients") return "clients";
-  return target === "network-routes" || target.startsWith("route-")
+  return target === "network-routes" ||
+    target === "network-attention" ||
+    target.startsWith("route-")
     ? "routes"
     : null;
 }

@@ -20,6 +20,7 @@ import NetworkOverview, {
 } from "./NetworkOverview";
 import { routeRows } from "../analysis";
 import { readPreference } from "../navigation";
+import { taskFocus } from "../workbench";
 import type { DirectRouteStatus } from "../../shared/direct";
 import {
   Activity,
@@ -1006,7 +1007,7 @@ export function NetworkPage() {
     if (targetSection === "routes") {
       setRouteView("cards");
       setRouteSearch("");
-      setRouteFilter("all");
+      setRouteFilter(focusTarget === "network-attention" ? "attention" : "all");
     }
   }, [focusTarget, navigationKey]);
   const [routeActionPending, setRouteActionPending] = useState(false);
@@ -1193,6 +1194,14 @@ export function NetworkPage() {
         {direct.error && (
           <QueryError error={direct.error} retry={direct.reload} />
         )}
+        {!allRows.length &&
+          !q.loading &&
+          !direct.loading &&
+          focusTarget === "network-attention" && (
+            <span id="network-attention" tabIndex={-1}>
+              暂无可筛选的入口
+            </span>
+          )}
         {!!allRows.length && (
           <>
             <NetworkToolbar
@@ -2011,7 +2020,7 @@ export function SchedulesPage() {
       </Notice>
       <div className="schedule-grid">
         {tasks.map((s) => (
-          <Panel key={s.id} className="schedule-card">
+          <Panel key={s.id} id={"plan-" + s.id} className="schedule-card">
             <span className="table-icon">
               <CalendarClock size={21} />
             </span>
@@ -2204,12 +2213,22 @@ export function SchedulesPage() {
 
 export function TasksPage() {
   const data = useApp((s) => s.data)!;
+  const focusTarget = useApp((s) => s.focusTarget);
+  const navigationKey = useApp((s) => s.navigationKey);
   const [tab, setTab] = useState("active");
   const [instance, setInstance] = useState("all");
   const [search, setSearch] = useState("");
   const [resultFilter, setResultFilter] = useState("all");
   const [detailId, setDetailId] = useState("");
   const detail = data.jobs.find((j) => j.id === detailId);
+  useEffect(() => {
+    const scope = taskFocus(focusTarget);
+    if (!scope) return;
+    setTab(scope.tab);
+    setResultFilter(scope.result);
+    setInstance(useApp.getState().selected);
+    setSearch("");
+  }, [focusTarget, navigationKey]);
   const matches = (id: string | null) =>
     instance === "all" || (instance === "workspace" ? !id : id === instance);
   const jobs = data.jobs.filter(
@@ -2237,7 +2256,10 @@ export function TasksPage() {
         description="查看所有实例的后台执行进度、结果和操作记录。"
         actions={<Badge tone="green">独立后台持续执行</Badge>}
       />
-      <div className="list-toolbar">
+      <div
+        className="list-toolbar"
+        id={taskFocus(focusTarget) ? focusTarget : undefined}
+      >
         <div className="segmented">
           {[
             ["active", "执行中"],
@@ -2247,14 +2269,17 @@ export function TasksPage() {
             <button
               key={key}
               className={tab === key ? "active" : ""}
+              aria-pressed={tab === key}
               onClick={() => setTab(key)}
             >
               {label}
               {key === "active" && (
                 <Badge>
                   {
-                    data.jobs.filter((j) =>
-                      ["running", "queued"].includes(j.status),
+                    data.jobs.filter(
+                      (j) =>
+                        matches(j.instanceId) &&
+                        ["running", "queued"].includes(j.status),
                     ).length
                   }
                 </Badge>
@@ -2799,6 +2824,7 @@ export function SettingsPage() {
 
 export function InstanceDialog({
   open,
+  initialMode,
   onClose,
   updateId,
   suggestedVersion,
@@ -2807,6 +2833,7 @@ export function InstanceDialog({
   open: boolean;
   onClose: () => void;
   updateId?: string;
+  initialMode?: "import" | "create";
   suggestedVersion?: string;
   suggestedCore?: "bds" | "endstone";
 }) {
@@ -2830,6 +2857,7 @@ export function InstanceDialog({
       )}
       {open && ready && (
         <InstanceForm
+          initialMode={initialMode}
           onClose={onClose}
           updateId={updateId}
           suggestedVersion={suggestedVersion}
@@ -2840,6 +2868,7 @@ export function InstanceDialog({
   );
 }
 function InstanceForm({
+  initialMode = "import",
   onClose,
   updateId,
   suggestedVersion,
@@ -2849,12 +2878,13 @@ function InstanceForm({
   updateId?: string;
   suggestedVersion?: string;
   suggestedCore?: "bds" | "endstone";
+  initialMode?: "import" | "create";
 }) {
   const data = useApp((s) => s.data)!;
   const current = data.instances.find(
     (i) => i.id === (updateId || useApp.getState().selected),
   );
-  const [mode, setMode] = useState(updateId ? "create" : "import");
+  const [mode, setMode] = useState(updateId ? "create" : initialMode);
   const [step, setStep] = useState(0);
   const [name, setName] = useState("新的方舟世界");
   const [root, setRoot] = useState(updateId ? current?.root || "" : "");
@@ -2880,11 +2910,7 @@ function InstanceForm({
           "install.update",
           {
             id: updateId,
-            version:
-              version ||
-              (core === "endstone"
-                ? catalog.data?.endstone?.version
-                : catalog.data?.bds?.version),
+            version: targetVersion,
             zip: zip || undefined,
             targetCore: core,
           },
@@ -2908,7 +2934,7 @@ function InstanceForm({
             name,
             root,
             core,
-            version: version || catalog.data?.endstone?.version,
+            version: targetVersion,
             zip: zip || undefined,
             port,
             accepted,
@@ -2949,6 +2975,7 @@ function InstanceForm({
         <div className="segmented instance-tabs">
           <button
             className={mode === "import" ? "active" : ""}
+            aria-pressed={mode === "import"}
             onClick={() => {
               setMode("import");
               setAccepted(false);
@@ -2958,6 +2985,7 @@ function InstanceForm({
           </button>
           <button
             className={mode === "create" ? "active" : ""}
+            aria-pressed={mode === "create"}
             onClick={() => {
               setMode("create");
               setAccepted(false);

@@ -1,31 +1,27 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { motion, MotionConfig, useReducedMotion } from "motion/react";
+import { motion, MotionConfig } from "motion/react";
+import { useMotionPreference } from "./use-motion-preference";
 import {
-  ArrowUpRight,
-  BarChart3,
+  FolderOpen,
+  Layers3,
   Box,
   ChevronRight,
-  Globe2,
   Plus,
-  RefreshCw,
-  Search,
   ShieldCheck,
 } from "lucide-react";
 import { act, date, useApp } from "./store";
-import { groups, isGlobal, navigation, pageInfo } from "./navigation";
+import { isGlobal, pageInfo } from "./navigation";
+import CommandPalette from "./CommandPalette";
 import type { Core } from "../shared/types";
 import {
-  Badge,
   Button,
   Confirm,
   Drawer,
   Empty,
   Loading,
-  Modal,
   Notice,
   Toasts,
-  VoxelScene,
 } from "./components";
 import PageBoundary from "./PageBoundary";
 import ProgramUpgrade from "./ProgramUpgrade";
@@ -78,7 +74,6 @@ export default function App() {
     refresh,
     receive,
     navigate,
-    select,
     sidebarCollapsed,
     toggleGroup,
     dirty,
@@ -94,7 +89,6 @@ export default function App() {
       refresh: s.refresh,
       receive: s.receive,
       navigate: s.navigate,
-      select: s.select,
       sidebarCollapsed: s.sidebarCollapsed,
       toggleGroup: s.toggleGroup,
       dirty: s.dirty,
@@ -104,22 +98,18 @@ export default function App() {
     })),
   );
   const density = useApp((s) => s.density);
-  const [create, setCreate] = useState(false);
+  const [create, setCreate] = useState<"import" | "create" | null>(null);
   const [update, setUpdate] = useState<{
     id: string;
     version?: string;
     core?: Core;
   } | null>(null);
   const [palette, setPalette] = useState(false);
-  const paletteNavigated = useRef(false);
-  const [search, setSearch] = useState("");
-  const [paletteIndex, setPaletteIndex] = useState(0);
   const [notices, setNotices] = useState(false);
   const [stop, setStop] = useState(false);
   const [restart, setRestart] = useState(false);
   const navigationKey = useApp((s) => s.navigationKey);
-  const systemReduced = useReducedMotion();
-  const reduced = !!data?.settings.reducedMotion || !!systemReduced;
+  const reduced = useMotionPreference();
   const info = pageInfo(page);
   const global = isGlobal(page);
   const current = data?.instances.find((i) => i.id === selected);
@@ -133,11 +123,22 @@ export default function App() {
       if (!document.hidden) void refresh();
     }, 20000);
     const key = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229)
+        return;
+      if (
+        document.querySelector('[role="dialog"]') &&
+        !document.getElementById("palette-results")
+      )
+        return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPalette((v) => !v);
       }
-      if ((event.ctrlKey || event.metaKey) && event.key === "`") {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.key === "`" &&
+        !document.querySelector('[role="dialog"]')
+      ) {
         event.preventDefault();
         navigate("console");
       }
@@ -180,7 +181,10 @@ export default function App() {
           element.getBoundingClientRect().top -
           main.getBoundingClientRect().top -
           24,
-        behavior: reduced ? "instant" : "smooth",
+        behavior:
+          document.documentElement.dataset.motion === "reduced"
+            ? "instant"
+            : "smooth",
       });
       const target = [
         ...element.querySelectorAll<HTMLElement>(
@@ -213,99 +217,9 @@ export default function App() {
     };
   }, [page, selected, focusTarget, navigationKey]);
   useEffect(() => {
-    setPaletteIndex(0);
-  }, [search]);
-  useEffect(() => {
     if (!useApp.getState().openGroups.includes(info.group))
       toggleGroup(info.group);
   }, [page]);
-  const openInstance = (id: string) => {
-    if (useApp.getState().dirty) {
-      useApp.setState({
-        pendingNavigation: { instance: id, page: "overview" },
-      });
-      return;
-    }
-    select(id);
-    navigate("overview");
-  };
-  const actions = [
-    {
-      label: "运行分析与趋势",
-      description: "只读 / 性能统计、日志归类、运维观察与导出",
-      icon: BarChart3,
-      run: () => navigate("analysis"),
-    },
-    {
-      label: "核心检查与更新",
-      description: "首页 / 版本、兼容组合与更新策略",
-      icon: RefreshCw,
-      run: () => navigate("overview", "core-updates"),
-    },
-    {
-      label: "线路质量与连接检测",
-      description: "网络线路 / 信令、握手与重连检测结果",
-      icon: Globe2,
-      run: () => navigate("network", "network-diagnostics"),
-    },
-    {
-      label: "统一信令转接",
-      description: "网络线路 / 上游配置与独立 UDP 映射",
-      icon: Globe2,
-      run: () => navigate("network", "network-signaling"),
-    },
-    {
-      label: "穿透客户端进程与日志",
-      description: "网络线路 / 客户端启停、独立 UDP 与进程日志",
-      icon: Globe2,
-      run: () => navigate("network", "network-clients"),
-    },
-    {
-      label: "新建或关联实例",
-      description: "工作空间 / 添加服务器",
-      icon: Plus,
-      run: () => setCreate(true),
-    },
-  ];
-  const term = search.toLowerCase().trim();
-  const results = [
-    ...actions
-      .filter((a) => `${a.label} ${a.description}`.toLowerCase().includes(term))
-      .map((a) => ({ ...a, key: a.label })),
-    ...navigation
-      .filter((n) =>
-        `${n.label} ${n.keywords} ${groups[n.group]}`
-          .toLowerCase()
-          .includes(term),
-      )
-      .map((n) => ({
-        key: n.page,
-        label: n.label,
-        description: groups[n.group],
-        icon: n.icon,
-        run: () => navigate(n.page),
-      })),
-    ...(data?.instances || [])
-      .filter((i) => i.name.toLowerCase().includes(term))
-      .map((i) => ({
-        key: i.id,
-        label: i.name,
-        description: `服务器实例 · ${i.core}`,
-        icon: Box,
-        run: () => openInstance(i.id),
-      })),
-  ];
-  const runResult = (index: number) => {
-    const result = results[index];
-    if (!result) return;
-    const previousKey = useApp.getState().navigationKey;
-    result.run();
-    const next = useApp.getState();
-    paletteNavigated.current =
-      next.navigationKey !== previousKey && !!next.focusTarget;
-    setPalette(false);
-    setSearch("");
-  };
   const content = () => {
     if (!data)
       return (
@@ -318,29 +232,27 @@ export default function App() {
     if (page === "tasks") return <TasksPage />;
     if (page === "tools") return <ToolsPage />;
     if (page === "instances")
-      return <InstancesPage onCreate={() => setCreate(true)} />;
+      return <InstancesPage onCreate={() => setCreate("import")} />;
     if (!current)
       return (
         <div className="welcome">
           <div className="welcome-copy">
-            <Badge tone="green">YOUR NEXT WORLD</Badge>
-            <h1>
-              让每个世界，
-              <br />
-              <em>都有序生长。</em>
-            </h1>
-            <p>
-              关联已有服务器，或从官方来源创建新的世界。
-              <br />
-              数据、运行环境与网络线路，在这里集中管理。
-            </p>
-            <Button variant="primary" onClick={() => setCreate(true)}>
-              <Plus size={17} />
-              添加第一台服务器
-              <ArrowUpRight size={16} />
-            </Button>
+            <span className="welcome-mark" aria-hidden="true">
+              <Layers3 size={28} />
+            </span>
+            <h1>服务器工作台</h1>
+            <p>当前工作空间尚无服务器实例。</p>
+            <div className="welcome-actions">
+              <Button variant="primary" onClick={() => setCreate("import")}>
+                <FolderOpen size={16} />
+                关联已有目录
+              </Button>
+              <Button onClick={() => setCreate("create")}>
+                <Plus size={16} />
+                创建新实例
+              </Button>
+            </div>
           </div>
-          <VoxelScene />
         </div>
       );
     switch (page) {
@@ -378,7 +290,7 @@ export default function App() {
   return (
     <MotionConfig
       reducedMotion={reduced ? "always" : "never"}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: reduced ? 0 : 0.19, ease: [0.22, 1, 0.36, 1] }}
     >
       <div
         className={`app-shell studio-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
@@ -391,7 +303,7 @@ export default function App() {
             onStop={() => setStop(true)}
             onRestart={() => setRestart(true)}
           />
-          <main className="main-scroll">
+          <main className="main-scroll" tabIndex={-1} aria-label={info.label}>
             {error && (
               <Notice tone="warn">
                 {error}
@@ -446,7 +358,11 @@ export default function App() {
         <Toasts />
         {create && (
           <Suspense fallback={null}>
-            <InstanceDialog open={create} onClose={() => setCreate(false)} />
+            <InstanceDialog
+              open
+              initialMode={create}
+              onClose={() => setCreate(null)}
+            />
           </Suspense>
         )}
         {!!update && (
@@ -498,86 +414,11 @@ export default function App() {
           label="放弃修改并继续"
           onConfirm={completeNavigation}
         />
-        <Modal
+        <CommandPalette
           open={palette}
           onClose={() => setPalette(false)}
-          onCloseAutoFocus={(event) => {
-            if (!paletteNavigated.current) return;
-            event.preventDefault();
-            paletteNavigated.current = false;
-            useApp.setState((state) => ({
-              navigationKey: state.navigationKey + 1,
-            }));
-          }}
-          title="命令与导航"
-          description="搜索功能、服务器和常用操作；方向键选择，Enter 打开。"
-        >
-          <div className="palette-search">
-            <Search size={19} />
-            <input
-              autoFocus
-              aria-label="搜索全部功能"
-              role="combobox"
-              aria-expanded={palette}
-              aria-autocomplete="list"
-              aria-controls="palette-results"
-              aria-activedescendant={
-                results[paletteIndex]
-                  ? `palette-result-${paletteIndex}`
-                  : undefined
-              }
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="试试：核心更新、信令、备份…"
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setPaletteIndex((i) => Math.min(results.length - 1, i + 1));
-                }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setPaletteIndex((i) => Math.max(0, i - 1));
-                }
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  runResult(paletteIndex);
-                }
-              }}
-            />
-            <kbd>Esc</kbd>
-          </div>
-          <div
-            className="palette-results"
-            id="palette-results"
-            role="listbox"
-            aria-label="功能搜索结果"
-          >
-            {results.map((r, i) => (
-              <button
-                key={r.key}
-                id={`palette-result-${i}`}
-                role="option"
-                aria-selected={paletteIndex === i}
-                className={paletteIndex === i ? "selected" : ""}
-                onMouseEnter={() => setPaletteIndex(i)}
-                onClick={() => runResult(i)}
-              >
-                <r.icon size={18} />
-                <span>
-                  <strong>{r.label}</strong>
-                  <small>{r.description}</small>
-                </span>
-                <ArrowUpRight size={15} />
-              </button>
-            ))}
-            {!results.length && (
-              <Empty
-                title="没有找到相关功能"
-                description="试试功能名、实例名或操作关键词。"
-              />
-            )}
-          </div>
-        </Modal>
+          onCreate={() => setCreate("import")}
+        />
         <Drawer
           open={notices}
           onClose={() => setNotices(false)}

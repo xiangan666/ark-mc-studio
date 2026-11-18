@@ -27,7 +27,10 @@ import {
   routeRows,
   summarizeMetric,
   transportLabel,
+  metricChartPoints,
+  type MetricKind,
 } from "../analysis";
+import InstanceBrief from "./InstanceBrief";
 import CoreUpdates from "./CoreUpdates";
 import { act, bytes, date, duration, useApp } from "../store";
 import {
@@ -38,6 +41,8 @@ import {
   Heading,
   Panel,
   PageTabs,
+  QueryError,
+  Status,
   tabPanelProps,
   useQuery,
 } from "../components";
@@ -84,6 +89,17 @@ export default function Dashboard({
     direct.data,
     quality.data,
   );
+  const routeError = network.error || direct.error || quality.error;
+  const routeState = routeError
+    ? "error"
+    : !network.updatedAt || !direct.updatedAt || !quality.updatedAt
+      ? "pending"
+      : "ready";
+  const retryRoutes = () => {
+    network.reload();
+    direct.reload();
+    quality.reload();
+  };
   const metrics = useMemo(
     () => metricSeries(history.data || [], snap?.metric, hours),
     [history.data, snap?.metric, hours],
@@ -103,7 +119,6 @@ export default function Dashboard({
   const activities = data!.activities
     .filter((a) => a.instanceId === selected)
     .slice(0, 5);
-  const jobs = data!.jobs.filter((j) => j.instanceId === selected).slice(0, 4);
   const focusTarget = useApp((s) => s.focusTarget);
   const navigationKey = useApp((s) => s.navigationKey);
   const [section, setSection] = useState<"runtime" | "maintenance">("runtime");
@@ -152,13 +167,11 @@ export default function Dashboard({
       note: "服务端进程工作集",
       kind: "memory",
     },
-  ];
+  ] as const;
   return (
     <div className="page overview-page">
       <Heading
-        eyebrow="YOUR WORLD, UNDER CONTROL"
         title="服务器总览"
-        description="查看当前实例的运行状态、玩家入口和近期操作。"
         actions={
           <>
             <Button onClick={() => navigate("analysis")}>
@@ -188,49 +201,69 @@ export default function Dashboard({
         hidden={section !== "runtime"}
         aria-label="服务器运行概况"
       >
-        <section className="world-hero server-summary">
-          <div className="server-summary-identity">
-            <span className="server-summary-icon">
-              <Box size={24} />
-            </span>
-            <div>
-              <h2>{snap?.world || instance.name}</h2>
-              <p>
-                {instance.core === "endstone"
-                  ? "Endstone " + (snap?.endstoneVersion || "")
-                  : "官方 BDS"}{" "}
-                · Bedrock {snap?.version || "读取中"}
-              </p>
+        <div className="instance-summary-band">
+          <section
+            className="world-hero server-summary"
+            aria-label="当前世界资料"
+          >
+            <div className="server-summary-identity">
+              <span className="server-summary-icon">
+                <Box size={24} />
+              </span>
+              <div>
+                <div className="world-identity">
+                  <h2>{snap?.world || instance.name}</h2>
+                  <Status status={snap?.status || "unknown"} />
+                </div>
+                <p>
+                  {instance.core === "endstone"
+                    ? "Endstone " + (snap?.endstoneVersion || "")
+                    : "官方 BDS"}{" "}
+                  · Bedrock {snap?.version || "未读取"}
+                </p>
+              </div>
             </div>
-          </div>
-          <dl>
-            <div>
-              <dt>传输</dt>
-              <dd>
-                {snap?.transport === "nethernet" ? "NetherNet" : "RakNet"} ·{" "}
-                {snap?.port || 19132}
-              </dd>
-            </div>
-            <div>
-              <dt>运行时长</dt>
-              <dd>
-                {snap?.pid && snap.startedAt
-                  ? duration((Date.now() - snap.startedAt) / 1000)
-                  : "尚未启动"}
-              </dd>
-            </div>
-          </dl>
-          <Button onClick={() => navigate("worlds")}>
-            管理世界
-            <ArrowRight size={14} />
-          </Button>
-        </section>
+            <dl>
+              <div>
+                <dt>传输</dt>
+                <dd>
+                  {snap?.transport === "nethernet"
+                    ? "NetherNet"
+                    : snap?.transport === "raknet"
+                      ? "RakNet"
+                      : snap?.transport || "—"}{" "}
+                  · {snap?.port ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>运行时长</dt>
+                <dd>
+                  {snap?.pid && snap.startedAt
+                    ? duration((Date.now() - snap.startedAt) / 1000)
+                    : snap?.status === "stopped"
+                      ? "尚未启动"
+                      : "—"}
+                </dd>
+              </div>
+            </dl>
+            <Button onClick={() => navigate("worlds")}>
+              管理世界
+              <ArrowRight size={14} />
+            </Button>
+          </section>
+          <InstanceBrief
+            id={selected}
+            data={data!}
+            routes={routes}
+            routeState={routeState}
+          />
+        </div>
         <div className="kpi-grid">
           {kpis.map((k) => (
             <button
               className={`kpi-card ${k.color} ${metric === k.kind ? "selected" : ""}`}
               key={k.label}
-              onClick={() => setMetric(k.kind as typeof metric)}
+              onClick={() => setMetric(k.kind)}
               aria-pressed={metric === k.kind}
             >
               <div className="kpi-label">
@@ -245,7 +278,7 @@ export default function Dashboard({
               </div>
               <div className="kpi-bottom">
                 <span>{k.note}</span>
-                <Spark metrics={metrics} field={k.kind as any} />
+                <Spark metrics={metrics} field={k.kind} />
               </div>
             </button>
           ))}
@@ -256,8 +289,14 @@ export default function Dashboard({
             最近采样 {date(snap?.metric.at)}
           </span>
           <span>
-            {routes.length} 条玩家入口 ·{" "}
-            {routes.filter((r) => r.running).length} 条进程就绪
+            {routeState === "ready"
+              ? routes.length +
+                " 条玩家入口 · " +
+                routes.filter((r) => r.running).length +
+                " 条进程就绪"
+              : routeState === "error"
+                ? "线路状态未确认"
+                : "正在读取线路"}
           </span>
           <button className="text-button" onClick={() => navigate("analysis")}>
             查看趋势与问题观察
@@ -285,6 +324,7 @@ export default function Dashboard({
               {(["cpu", "memory", "tps", "players"] as const).map((k) => (
                 <button
                   className={metric === k ? "active" : ""}
+                  aria-pressed={metric === k}
                   key={k}
                   onClick={() => setMetric(k)}
                 >
@@ -312,7 +352,19 @@ export default function Dashboard({
                 </button>
               ))}
             </div>
-            <Chart metrics={metrics} kind={metric} height={210} />
+            {history.error && (
+              <QueryError error={history.error} retry={history.reload} />
+            )}
+            {metrics.some((m) => m[metric] !== null) ? (
+              <Chart metrics={metrics} kind={metric} height={210} interactive />
+            ) : (
+              <div className="no-metric">
+                <Activity size={22} />
+                <strong>
+                  {history.loading ? "正在读取性能样本" : "此时段暂无有效样本"}
+                </strong>
+              </div>
+            )}
             <div className="metric-stat-strip">
               <span>
                 样本均值 <strong>{statValue(stats.average)}</strong>
@@ -335,6 +387,9 @@ export default function Dashboard({
             subtitle="独立入口，通向同一个世界"
             aside={<IconLink onClick={() => navigate("network")} />}
           >
+            {routeError && (
+              <QueryError error={routeError} retry={retryRoutes} />
+            )}
             {routes.length ? (
               <div className="route-summary-list">
                 {routes.map((r, index) => (
@@ -369,11 +424,15 @@ export default function Dashboard({
                   </span>
                 </div>
               </div>
+            ) : routeState === "error" ? null : routeState === "pending" ? (
+              <div className="route-pending" role="status">
+                正在读取玩家入口…
+              </div>
             ) : (
               <Empty
                 icon={Globe2}
                 title="还没有关联线路"
-                description="选择客户端目录即可接入现有 Lolia 隧道。"
+                description="此实例尚未配置隧道或原生 IPv6 入口。"
                 action={
                   <Button onClick={() => navigate("network")}>配置网络</Button>
                 }
@@ -431,15 +490,15 @@ export default function Dashboard({
                 },
                 {
                   icon: Box,
-                  label: "世界与模组",
-                  note: "管理内容与资源包",
+                  label: "模组与插件",
+                  note: "行为包、资源包与插件",
                   action: () => navigate("packs"),
                 },
                 {
                   icon: Globe2,
                   label: "线路诊断",
                   note: "检查各条公网入口",
-                  action: () => navigate("network"),
+                  action: () => navigate("network", "network-diagnostics"),
                 },
                 {
                   icon: HardDrive,
@@ -459,18 +518,6 @@ export default function Dashboard({
                   <ArrowUpRight size={14} />
                 </button>
               ))}
-            </div>
-            <div className="recent-task">
-              <span className="small-dot green" />
-              <span>
-                {jobs[0]
-                  ? `${jobs[0].title} · ${jobs[0].status === "success" ? "已完成" : jobs[0].detail}`
-                  : "准备就绪，随时开始新的任务"}
-              </span>
-              <button onClick={() => navigate("tasks")}>
-                任务中心
-                <ChevronRight size={12} />
-              </button>
             </div>
           </Panel>
         </div>
@@ -497,26 +544,39 @@ function IconLink({ onClick }: { onClick: () => void }) {
     </button>
   );
 }
-function Spark({ metrics, field }: { metrics: Metric[]; field: keyof Metric }) {
-  const values = metrics
-    .slice(-25)
-    .map((m) => m[field])
-    .filter((v): v is number => typeof v === "number");
-  if (values.length < 2) return <div className="spark-placeholder" />;
-  const max = Math.max(...values, 1),
-    min = Math.min(...values, 0);
+function Spark({ metrics, field }: { metrics: Metric[]; field: MetricKind }) {
+  const points = metricChartPoints(metrics.slice(-25), field);
+  const values = points.flatMap(([, v]) => (v === null ? [] : [v]));
+  if (values.length < 2) return null;
+  const low = Math.min(...values),
+    high = Math.max(...values),
+    first = points[0][0],
+    span = points.at(-1)![0] - first;
+  let move = true;
+  const line = points
+    .map(([at, v]) => {
+      if (v === null) {
+        move = true;
+        return "";
+      }
+      const cmd = move ? "M" : "L";
+      move = false;
+      return (
+        cmd +
+        (((at - first) / (span || 1)) * 70 + 2) +
+        " " +
+        (high === low ? 12 : 22 - ((v - low) / (high - low)) * 20)
+      );
+    })
+    .join(" ");
   return (
-    <svg className="spark" viewBox="0 0 75 25">
+    <svg className="spark" viewBox="0 0 74 24" aria-hidden="true">
       <path
-        d={values
-          .map(
-            (v, i) =>
-              `${i ? "L" : "M"}${(i / (values.length - 1)) * 75} ${23 - ((v - min) / (max - min || 1)) * 20}`,
-          )
-          .join(" ")}
+        d={line}
         fill="none"
         stroke="currentColor"
         strokeWidth="1.6"
+        strokeLinecap="round"
       />
     </svg>
   );

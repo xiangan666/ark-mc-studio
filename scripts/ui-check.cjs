@@ -95,6 +95,7 @@ async function main() {
       if (msg.type() === "error") errors.push(msg.text());
     });
     await page.waitForSelector(".welcome", { timeout: 45000 });
+    await require("./ui-operations-workbench.cjs").firstUse(page, artifacts);
     await page.evaluate(async (root) => {
       await window.ark.call("instances.import", { root });
       await window.ark.call("settings.save", { reducedMotion: true });
@@ -251,6 +252,11 @@ async function main() {
       server,
     });
     await require("./ui-workspace-design.cjs")({ page, app, artifacts });
+    await require("./ui-operations-workbench.cjs").workbench(
+      page,
+      temp,
+      artifacts,
+    );
     await page.keyboard.press("Control+k");
     await page.waitForSelector(".palette-search");
     await page.keyboard.press("Escape");
@@ -270,6 +276,7 @@ async function main() {
           integratedRouteCards: true,
           minimumWindow: true,
           workspaceDesign: true,
+          operationsWorkbench: true,
           layoutMatrixSkipped: process.argv.includes("--skip-layout-matrix"),
           errors,
         },

@@ -49,7 +49,7 @@ export function NetworkToolbar({
     }
   }
   return (
-    <div className="network-toolbar toolbar-surface">
+    <div className="network-toolbar toolbar-surface" id="network-attention">
       <SearchInput
         value={search}
         onChange={onSearch}
