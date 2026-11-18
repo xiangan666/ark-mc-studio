@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
+import { jobWindow } from "../shared/job-window";
 import type {
   Instance,
   Metric,
@@ -120,9 +121,7 @@ export class Store {
       .run(Date.now() - 90 * 86400000);
   }
   jobs() {
-    return this.list<Job>("jobs")
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 150);
+    return jobWindow(this.list<Job>("jobs"));
   }
   schedules() {
     return this.list<Schedule>("schedules");

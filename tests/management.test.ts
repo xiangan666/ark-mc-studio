@@ -436,6 +436,52 @@ test("在线备份精确截断已增长的数据库文件", async () => {
     await f.cleanup();
   }
 });
+test("近期记录不能挤掉较早实例的运行或排队任务，结束后恢复历史上限", async () => {
+  const f = await fixture();
+  try {
+    const job: Job = {
+      id: "long",
+      instanceId: f.i.id,
+      status: "running",
+      title: "长任务",
+      type: "backup",
+      progress: 60,
+      detail: "",
+      createdAt: 1,
+    };
+    f.store.put("jobs", job);
+    f.store.put("jobs", { ...job, id: "waiting", status: "queued" } as Job);
+    for (let i = 0; i < 180; i++) {
+      const finished: Job = {
+        ...job,
+        id: `other-${i}`,
+        instanceId: "other",
+        status: "success",
+        createdAt: i + 10,
+        progress: 100,
+      };
+      f.store.put("jobs", finished);
+    }
+    const visible = f.store.jobs();
+    assert.deepEqual(
+      visible
+        .filter((j) => j.instanceId === f.i.id)
+        .map((j) => j.id)
+        .sort(),
+      ["long", "waiting"],
+    );
+    assert.equal(visible.filter((j) => j.status === "success").length, 150);
+    for (const updated of visible.filter((j) => j.instanceId === f.i.id)) {
+      updated.status = "success";
+      f.store.put("jobs", updated);
+    }
+    assert.equal(f.store.jobs().length, 150);
+    assert.equal(f.store.jobs()[0].id, "other-179");
+  } finally {
+    await f.cleanup();
+  }
+});
+
 test("同一实例任务严格串行，不同实例可并行", async () => {
   const f = await fixture();
   try {

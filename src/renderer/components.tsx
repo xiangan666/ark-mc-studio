@@ -1,5 +1,6 @@
 import React, { useEffect, useState, type ReactNode } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useMotionPreference } from "./use-motion-preference";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import {
@@ -334,6 +335,7 @@ export function Modal({
   children,
   wide = false,
   presentation = "dialog",
+  onOpenAutoFocus,
   onCloseAutoFocus,
 }: {
   open: boolean;
@@ -343,10 +345,14 @@ export function Modal({
   children: ReactNode;
   wide?: boolean;
   presentation?: "dialog" | "drawer";
+  onOpenAutoFocus?: React.ComponentProps<
+    typeof Dialog.Content
+  >["onOpenAutoFocus"];
   onCloseAutoFocus?: React.ComponentProps<
     typeof Dialog.Content
   >["onCloseAutoFocus"];
 }) {
+  const opener = React.useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root
       open={open}
@@ -358,7 +364,24 @@ export function Modal({
         <Dialog.Overlay className="modal-overlay" />
         <Dialog.Content
           className={`modal ${wide ? "wide" : ""} ${presentation === "drawer" ? "drawer" : ""}`}
-          onCloseAutoFocus={onCloseAutoFocus}
+          onOpenAutoFocus={(event) => {
+            opener.current =
+              document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null;
+            onOpenAutoFocus?.(event);
+          }}
+          onCloseAutoFocus={(event) => {
+            onCloseAutoFocus?.(event);
+            if (event.defaultPrevented || !opener.current?.isConnected) return;
+            const dialog = document.querySelector(
+              '[role="dialog"][data-state="open"]',
+            );
+            if (!dialog || dialog.contains(opener.current)) {
+              event.preventDefault();
+              opener.current.focus({ preventScroll: true });
+            }
+          }}
         >
           <div className="modal-heading">
             <div>
@@ -394,8 +417,7 @@ export function Disclosure({
   open?: boolean;
 }) {
   const [open, setOpen] = useState(initial);
-  const reduced = useReducedMotion();
-  const preference = useApp((s) => s.data?.settings.reducedMotion);
+  const reduced = useMotionPreference();
   return (
     <div className={`disclosure ${open ? "is-open" : ""}`}>
       <button
@@ -412,7 +434,7 @@ export function Disclosure({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: reduced || preference ? 0 : 0.26 }}
+            transition={{ duration: reduced ? 0 : 0.2 }}
             className="disclosure-content"
           >
             <div>{children}</div>
@@ -728,86 +750,6 @@ export function Toasts() {
         </div>
       ))}
     </div>
-  );
-}
-export function VoxelScene({ compact = false }: { compact?: boolean }) {
-  const blocks: ReactNode[] = [];
-  const heights = (x: number, z: number) =>
-    Math.max(
-      0,
-      Math.round(
-        3 +
-          2.6 * Math.sin(x * 0.64 + z * 0.43) +
-          1.5 * Math.cos(z * 0.83 - x * 0.2),
-      ),
-    );
-  for (let z = 0; z < 12; z++)
-    for (let x = 0; x < 15; x++) {
-      const h = heights(x, z);
-      const px = 330 + (x - z) * 23;
-      const py = 75 + (x + z) * 11.5 - h * 14;
-      const top = h > 5 ? "#619e81" : h > 3 ? "#4c8d70" : "#32705e";
-      blocks.push(
-        <g key={`${x}-${z}`}>
-          <path d={`M${px} ${py}l23 11.5-23 11.5-23-11.5Z`} fill={top} />
-          <path
-            d={`M${px - 23} ${py + 11.5}l23 11.5v${18 + h * 3}l-23-11.5Z`}
-            fill={h > 4 ? "#234a43" : "#193d38"}
-          />
-          <path
-            d={`M${px} ${py + 23}l23-11.5v${18 + h * 3}l-23 11.5Z`}
-            fill={h > 4 ? "#305d4c" : "#234e44"}
-          />
-          <path
-            d={`M${px} ${py}l23 11.5-23 11.5-23-11.5Z`}
-            fill="none"
-            stroke="#b9ffd6"
-            strokeOpacity=".08"
-          />
-        </g>,
-      );
-    }
-  return (
-    <svg
-      className={`voxel-scene ${compact ? "compact" : ""}`}
-      viewBox="0 0 720 410"
-      aria-hidden="true"
-    >
-      <defs>
-        <radialGradient id="world-glow">
-          <stop stopColor="#5beaa1" stopOpacity=".25" />
-          <stop offset="1" stopColor="#5beaa1" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="360" cy="225" rx="340" ry="170" fill="url(#world-glow)" />
-      <g transform="translate(0,-8)">
-        {blocks}
-        <g transform="translate(400,84)">
-          <path d="m-10 30 10-6 10 6v45l-10 6-10-6Z" fill="#564c40" />
-          <path d="m0-15 46 24v36L0 69-46 45V9Z" fill="#285a47" />
-          <path d="m0-15 46 24L0 33-46 9Z" fill="#87bd86" />
-          <path d="M0 33 46 9v36L0 69Z" fill="#3f7d5b" />
-          <path d="m-24-34 48 0 22 17L0 8-46-17Z" fill="#67a77c" />
-        </g>
-        <g transform="translate(258,131)">
-          <path d="m-7 15 7-4 7 4v30l-7 4-7-4Z" fill="#4f493e" />
-          <path d="m0-30 33 17v27L0 31-33 14v-27Z" fill="#397350" />
-          <path d="m0-30 33 17L0 4-33-13Z" fill="#a1c89b" />
-        </g>
-        <g transform="translate(340,67)">
-          <path d="m0 0 35 18-35 18-35-18Z" fill="#a596d5" />
-          <path d="M-35 18 0 36v29l-35-18Z" fill="#5b547e" />
-          <path d="m0 36 35-18v29L0 65Z" fill="#787099" />
-          <path d="m-16 17 16-8 16 8-16 8Z" fill="#d7caff" opacity=".8" />
-        </g>
-      </g>
-      <g className="world-sparks" fill="#9bf4ba">
-        <rect x="570" y="85" width="4" height="4" />
-        <rect x="210" y="98" width="3" height="3" />
-        <rect x="500" y="45" width="3" height="3" />
-        <rect x="595" y="200" width="3" height="3" />
-      </g>
-    </svg>
   );
 }
 

@@ -134,28 +134,9 @@
 .pulse {
   animation: pulse 2.8s infinite;
 }
-.voxel-scene {
-  position: absolute;
-  width: 650px;
-  height: 370px;
-  right: -35px;
-  top: -26px;
-  pointer-events: none;
-  filter: drop-shadow(0 22px 18px #020d0a85);
-  opacity: 0.95;
-}
-.world-sparks {
-  animation: spark 6s ease-in-out infinite;
-}
 .spark {
   color: var(--green);
   opacity: 0.7;
-}
-.spark-placeholder {
-  width: 45px;
-  height: 1px;
-  background: var(--line);
-  margin-right: 3px;
 }
 .chart-tabs {
   display: flex;
@@ -349,28 +330,6 @@
   color: var(--dim);
   width: 11px;
 }
-.recent-task {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border-top: 1px solid var(--line-soft);
-  padding: 13px 19px;
-  font-size: 9px;
-  color: var(--dim);
-}
-.recent-task > span:nth-child(2) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-.recent-task > button {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 9px;
-  color: var(--muted);
-}
 .welcome {
   position: relative;
   min-height: 600px;
@@ -397,13 +356,6 @@
   color: var(--muted);
   line-height: 2;
   margin: 0 0 28px;
-}
-.welcome .voxel-scene {
-  right: -55px;
-  top: 115px;
-  width: 720px;
-  height: 430px;
-  opacity: 0.8;
 }
 .checkbox-label {
   display: flex;
@@ -1366,12 +1318,6 @@
     opacity: 0.55;
   }
 }
-@keyframes spark {
-  50% {
-    opacity: 0.35;
-    transform: translateY(-5px);
-  }
-}
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -1392,9 +1338,6 @@
 }
 :root[data-theme="light"] .log-text {
   color: #4c6c5d;
-}
-:root[data-theme="light"] .voxel-scene {
-  filter: drop-shadow(0 15px 16px #072c1c42);
 }
 @media (min-width: 1550px) {
   .overview-page {

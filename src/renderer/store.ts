@@ -1,6 +1,14 @@
 import { create } from "zustand";
-import type { AgentEvent, Bootstrap, LogLine, Snapshot } from "../shared/types";
+import type {
+  AgentEvent,
+  Bootstrap,
+  Job,
+  LogLine,
+  Snapshot,
+} from "../shared/types";
+import { jobWindow } from "../shared/job-window";
 import { isGlobal, navigation, readPreference, type Page } from "./navigation";
+import { recentKey, recentKeys, rememberCommand } from "./command-search";
 export type { Page } from "./navigation";
 export interface Toast {
   id: number;
@@ -16,7 +24,14 @@ interface State {
   logs: Record<string, LogLine[]>;
   toasts: Toast[];
   dirty: string;
-  pendingNavigation: { page?: Page; instance?: string; target?: string } | null;
+  pendingNavigation: {
+    page?: Page;
+    instance?: string;
+    target?: string;
+    commandKey?: string;
+  } | null;
+  recentCommands: string[];
+  recordCommand: (key: string | null) => void;
   focusTarget: string;
   navigationKey: number;
   sidebarCollapsed: boolean;
@@ -49,6 +64,17 @@ export const useApp = create<State>((set, get) => ({
   toasts: [],
   dirty: "",
   pendingNavigation: null,
+  recentCommands: recentKeys(readPreference(recentKey, [])),
+  recordCommand: (key) => {
+    const recentCommands =
+      key === null ? [] : rememberCommand(get().recentCommands, key);
+    set({ recentCommands });
+    try {
+      localStorage.setItem(recentKey, JSON.stringify(recentCommands));
+    } catch {
+      // Keep navigation history usable for this session when storage is full.
+    }
+  },
   focusTarget: "",
   navigationKey: 0,
   sidebarCollapsed: readPreference("ark.sidebar-collapsed", false),
@@ -82,6 +108,7 @@ export const useApp = create<State>((set, get) => ({
     set({ dirty: "", pendingNavigation: null });
     if (next?.instance) get().select(next.instance);
     if (next?.page) get().navigate(next.page, next.target);
+    if (next?.commandKey) get().recordCommand(next.commandKey);
   },
   refresh: async () => {
     try {
@@ -178,14 +205,14 @@ export const useApp = create<State>((set, get) => ({
       });
     }
     if (event.type === "job") {
-      const job = event.data as any;
+      const job = event.data as Job;
       set({
         data: {
           ...state.data,
-          jobs: [job, ...state.data.jobs.filter((j) => j.id !== job.id)].slice(
-            0,
-            150,
-          ),
+          jobs: jobWindow([
+            job,
+            ...state.data.jobs.filter((j) => j.id !== job.id),
+          ]),
         },
         revision: ["success", "failed"].includes(job.status)
           ? state.revision + 1

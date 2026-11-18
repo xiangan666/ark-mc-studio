@@ -6,6 +6,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { backendCompatible } from "../src/shared/backend";
 import { version } from "../package.json";
+import {
+  recentKeys,
+  rememberCommand,
+  searchCommands,
+  type SearchCommand,
+} from "../src/renderer/command-search";
+import {
+  instanceBrief,
+  startBlocker,
+  taskFocus,
+  taskTargets,
+} from "../src/renderer/workbench";
+import { type Job, type Schedule } from "../src/shared/types";
 import { property, properties, safeResult } from "../src/renderer/editing";
 import {
   groups,
@@ -137,9 +150,164 @@ test("网络快捷入口映射到正确任务分区", () => {
     ["route-diagnostics-850", "diagnostics"],
     ["network-clients", "clients"],
     ["network-routes", "routes"],
+    ["network-attention", "routes"],
     ["route-tunnel-850", "routes"],
     ["route-direct", "routes"],
   ] as const)
     assert.equal(networkSectionForTarget(target), section);
   assert.equal(networkSectionForTarget("unknown"), null);
+});
+
+test("命令面板匹配全部词，先精确名称再最近记录，忽略不可用的历史项", () => {
+  const catalog: SearchCommand[] = [
+    {
+      key: "action:logs",
+      kind: "action",
+      label: "查看日志",
+      description: "管理工具",
+    },
+    {
+      key: "page:console",
+      kind: "page",
+      label: "日志",
+      description: "实时控制台",
+      keywords: "debug INFO",
+    },
+    {
+      key: "instance:other",
+      kind: "instance",
+      label: "日志示例",
+      description: "BDS",
+    },
+  ];
+  const recent = ["action:gone", "action:logs", "instance:other"];
+  const keys = (q: string, scope: Parameters<typeof searchCommands>[2]) =>
+    searchCommands(catalog, q, scope, recent).map((r) => r.key);
+  assert.deepEqual(keys("日志", "all"), [
+    "page:console",
+    "instance:other",
+    "action:logs",
+  ]);
+  assert.deepEqual(keys("ＩＮＦＯ  控制台", "all"), ["page:console"]);
+  assert.deepEqual(keys("", "recent"), ["action:logs", "instance:other"]);
+  assert.deepEqual(keys("日志", "action"), ["action:logs"]);
+  assert.deepEqual(keys("DEBUG BDS", "all"), []);
+  assert.deepEqual(keys("", "instance"), ["instance:other"]);
+});
+
+test("最近命令只保留八个不重复入口，损坏与非入口数据不导入", () => {
+  assert.deepEqual(recentKeys("broken"), []);
+  assert.deepEqual(
+    recentKeys([4, null, {}, "file:private", "page:console", "page:console"]),
+    ["page:console"],
+  );
+  const keys = Array.from({ length: 8 }, (_, i) => `instance:${i}`);
+  assert.deepEqual(rememberCommand(keys, "instance:3"), [
+    "instance:3",
+    ...keys.filter((k) => k !== "instance:3"),
+  ]);
+  assert.deepEqual(rememberCommand(keys, "action:create"), [
+    "action:create",
+    ...keys.slice(0, 7),
+  ]);
+});
+
+test("启动按钮只在已连接、采样就绪、实例空闲并确认停止时放行", () => {
+  const stopped = { status: "stopped", pid: null } as const;
+  assert.equal(startBlocker(stopped, true, false, false), "");
+  for (const status of [
+    "unmanaged",
+    "running",
+    "starting",
+    "stopping",
+    "unknown",
+  ] as const)
+    assert.ok(startBlocker({ status, pid: null }, true, false, false));
+  assert.ok(startBlocker({ ...stopped, pid: 123 }, true, false, false));
+  assert.ok(startBlocker(stopped, false, false, false));
+  assert.ok(startBlocker(stopped, true, true, false));
+  assert.ok(startBlocker(stopped, true, false, true));
+  assert.ok(startBlocker(undefined, true, false, false));
+});
+
+test("实例摘要隔离工作空间和其他实例，忽略过期或暂停计划，对应筛选一致", () => {
+  const job = (instanceId: string | null, status: Job["status"]): Job => ({
+    id: "j",
+    instanceId,
+    status,
+    title: "任务",
+    type: "backup",
+    progress: 0,
+    detail: "",
+    createdAt: 1,
+  });
+  const plan = (
+    instanceId: string,
+    enabled: boolean,
+    nextAt: number,
+  ): Schedule => ({
+    id: String(nextAt),
+    instanceId,
+    enabled,
+    nextAt,
+    name: "计划",
+    cron: "0 0 * * *",
+    action: "backup",
+  });
+  const plans = [
+    plan("b", true, 100),
+    plan("a", false, 101),
+    plan("a", true, 99),
+    plan("a", true, 105),
+    plan("a", true, 103),
+  ];
+  const jobs = [
+    job(null, "failed"),
+    job("b", "queued"),
+    job("a", "cancelled"),
+    job("a", "failed"),
+    job("a", "queued"),
+    job("a", "interrupted"),
+  ];
+  const base = {
+    kind: "tunnel",
+    key: "t",
+    name: "test",
+    address: "host.invalid",
+    running: true,
+    pending: false,
+    transport: "unknown",
+  } as const;
+  const summary = instanceBrief(
+    "a",
+    jobs,
+    plans,
+    [base, { ...base, transport: "fail" }, { ...base, pending: true }],
+    100,
+  );
+  assert.deepEqual(summary, {
+    active: 1,
+    issues: 2,
+    attention: 2,
+    next: plans[4],
+  });
+  assert.deepEqual(instanceBrief("c", jobs, plans, [], 100), {
+    active: 0,
+    issues: 0,
+    attention: 0,
+    next: undefined,
+  });
+  assert.deepEqual(taskFocus(taskTargets.active), {
+    tab: "active",
+    result: "all",
+  });
+  assert.deepEqual(taskFocus(taskTargets.issues), {
+    tab: "history",
+    result: "issues",
+  });
+  assert.deepEqual(taskFocus(taskTargets.history), {
+    tab: "history",
+    result: "all",
+  });
+  assert.equal(taskFocus("unknown"), null);
 });
